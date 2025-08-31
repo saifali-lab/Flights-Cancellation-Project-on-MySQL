@@ -541,6 +541,298 @@ group by origin_airport,destination_airport
 order by avg_arrival_delay
 limit 10;
 
+# Advance-level queries
+
+# Find the most common cancellation reason
+select * from flights_datasets;
+
+select * from airports;
+select * from airlines;
+select * from flights_datasets;
+
+
+select cancellation_reason,
+count(*) as cancellation_reason
+from flights_datasets
+group by most_reason
+order by most_reason ;
+
+# Find the top 5 airlines that had the most flights from a specific airport
+select * from flights_datasets;
+select airline,
+specific_airport
+from ( select origin_airport,
+count(*) as specific_airport
+from flights_datasets
+group by origin_airport
+order by specific_airport desc limit 1)
+as T
+order by airline;
+
+select airline,
+count(*) as total_airline
+from flights_datasets
+where origin_airport  = "ATL"
+group by airline
+order by  total_airline desc
+LIMIT  5;
+
+# For each airline, Find the route (origin - destination) with the higest number of flights
+select * from flights_datasets;
+select airline,
+count(*) as total_flights,
+origin_airport,
+destination_airport
+from flights_datasets
+group by origin_airport,
+destination_airport
+order by total_flights desc;
+
+# Find the top 5 airports with the most incoming flights
+select * from flights_datasets;
+select destination_airport,
+count(*) as incoming_flights
+from flights_datasets
+group by destination_airport
+order by
+incoming_flights desc limit 5;
+
+# Find flights where departure delay is more than the arrival delay
+select * from flights_datasets;
+select airline,
+flight_number,
+origin_airport,
+destination_airport,
+departure_delay,
+arrival_delay
+from flights_datasets
+where departure_delay > arrival_delay;
+
+# for each airline, find the month with highest average delay
+select * from flights_datasets;
+select month,
+airline,
+avg(departure_delay) as avg_departure_delay
+group by airline,month
+order by avg_departure_delay desc;
+
+# Find the airline with maximum total delay
+select * from flights_datasets;
+select airline,
+max(departure_delay) as maximum_departure_delay
+from flights_datasets
+group by airline
+order by maximum_departure_delay desc ;
+
+# Find the top 3 airlines with the highest on-time percentage
+select airline,
+(sum(case when arrival_delay <= 0 then 1 else 0 end )*100.0/count(*)) as ontime_percentage
+from flights_datasets
+group by airline
+order by ontime_percentage desc limit 3;
+ 
+
+
+# List the airlines that had more than 10,000 flights
+select airline,
+count(*) as total_airlines
+from flights_datasets
+group by airline
+having airline > 10000
+order by total_airlines desc;
+
+# find the top 10 routes with the longest average delay
+select * from flights_datasets;
+select
+origin_airport,
+destination_airport,
+avg(arrival_delay) as avg_arrival_delay
+from flights_datasets
+group by origin_airport,destination_airport
+order by avg_arrival_delay
+limit 10;
+
+ for each airline,rank their flight by departure delay
+select airline,
+flight_number,
+departure_delay,
+rank() over(partition by airline order by departure_delay desc) as rank_flights
+from flights_datasets;
+
+# for each month, find the airline with the worst average arrival delay
+select month,
+airline,
+avg(arrival_delay) over(partition by month order by airline) as worst_arrival_delay
+from flights_datasets;
+
+
+
+select
+month,
+airline,
+avg_arrival_delay,
+rank() over(partition by month order by avg_arrival_delay desc) as worst_avg_delay
+from ( select month,
+              airline,
+              avg(arrival_delay) as avg_arrival_delay
+              from flights_datasets
+              group by month,airline) as t ;
+              
+     # Find the busiest route per airline using rank()
+
+     select
+     airline,
+     origin_airport,
+     destination_airport,
+     busiest_route ,
+     rank() over(partition by airline order by busiest_route desc) as busy_road
+     from ( select airline,
+     origin_airport,
+     destination_airport,
+	count(*) as busiest_route
+    from flights_datasets
+    group by airline,
+     origin_airport,
+     destination_airport) as t;
+     
+     # for each day of the week , find the top 3 airlines with most flights
+select * from flights_datasets;
+select day_of_week,
+airline,
+most_flights,
+rank() over(partition by day_of_week order by most_flights desc) as flights_most
+from ( select
+        day_of_week,
+        airline,
+        count(*) as most_flights
+        from flights_datasets
+        group by day_of_week,airline
+        order by most_flights desc limit 3) as t;
+	
+    select * from
+    ( select day_of_week,
+            airline,
+            count(*) as most_flights,
+            rank() over(partition by day_of_week order by count(*) desc) as flight_rank
+            from flights_datasets
+            group by day_of_week,airline
+            ) as t
+            where flight_rank <=3;
+    
+            
+            # difference between group by and partition by
+            SELECT airline, AVG(departure_delay)
+FROM flights_datasets
+GROUP BY airline;
+
+SELECT airline,
+       flight_number,
+       departure_delay,
+       AVG(departure_delay) OVER (PARTITION BY airline) AS avg_delay
+FROM flights_datasets;
+
+    # Show the month-over-month trend in average delay for each airline ( using LAG )
+            
+-- Show month-over-month trend in average delay for each airline
+SELECT
+    airline,
+    month,
+    AVG(arrival_delay) AS avg_delay,
+    LAG(AVG(arrival_delay)) OVER (
+        PARTITION BY airline ORDER BY month
+    ) AS prev_month_delay,
+    (AVG(arrival_delay) - LAG(AVG(arrival_delay)) OVER (
+        PARTITION BY airline ORDER BY month
+    )) AS mom_change
+FROM flights_datasets
+GROUP BY airline, month
+ORDER BY airline, month;
+
+# Find the top 5 flights with the longest cumulative delays (use SUM() OVER).
+
+select airline,
+      longest_delays
+      from ( select
+      airline,
+      sum(arrival_delay)  over(partition by airline order by longest_delay) as cumulative_delays
+      from flights_datasets
+      ) as t
+      group by airline;
+      
+      select
+      flight_number,
+      origin_airport,
+      destination_airport,
+      sum(arrival_delay)  over(partition by flight_number) as total_delay
+      from flights_datasets
+      group by flight_number,origin_airport,destination_airport
+      order by total_delay desc
+      limit 5;
+      
+      # for each origin airport, find the airline with the worst average delay
+      
+      select 
+      airline,
+      origin_airport,
+      avg_delay,
+      rank()  over(partition by origin_airport order by avg_delay desc) as worst_avg_delay
+      from ( select 
+      
+      from ( select airline,
+                    origin_airport,
+                    avg(arrival_delay) as avg_delay
+                    from flights_datasets
+                    group by origin_airport,airline) t
+                    where avg_delay is not null
+                    order by origin_airport, worst_avg_delay;
+                    
+     # for each route, calculate the avg delay and rank routes per airline
+     select
+     airline,
+     origin_airport,
+     destination_airport,
+     avg_arrival_delay,
+     rank() over(partition by airline order by avg_arrival_delay desc) as rank_routes
+     from (
+     select airline,
+     origin_airport,
+     destination_airport,
+     avg(arrival_delay) as avg_arrival_delay
+     from flights_datasets
+     group by airline, origin_airport,
+     destination_airport
+     ) t
+     order by airline,rank_routes;
+     
+     select * from flights_datasets;
+     # Find the top 3 airports with the worst average depature delays per month
+     select* from(select month,
+     origin_airport,
+     avg_departure_delays,
+     rank() over(partition by month order by avg_departure_delays desc) as rank_airports
+     from ( select 
+     month,
+     origin_airport,
+     avg(departure_delay) as avg_departure_delays
+     from flights_datasets
+     group by month,origin_airport) as t
+     ) ranked 
+     where rank_airports <=3
+     order by month, rank_airports;
+     
+   #  Find the percentage of flights delayed vs. on-time per airline.
+   select * from flights_datasets;
+   select 
+   airline,
+   sum(case when departure_delay > 0 then 1 else 0 end) as delayed_flight,
+   sum(case when departure_delay <= 0 then 1 else 0 end) as on_time_flight,
+   round(100.0*sum(case when departure_delay > 0 then 1 else 0 end ) / count(*),2) as pct_delayed,
+   round(100.0 * sum( case when departure_delay < 0 then 1 else 0 end)/ count(*),2) as pct_on_time
+   from flights_datasets
+   group by airline
+   order by pct_delayed desc;
+   
+
 
 
 
